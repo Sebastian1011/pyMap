@@ -1,4 +1,4 @@
-# pyMap
+# py_map
 
 Map tiles Download Helper
 
