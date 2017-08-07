@@ -1,100 +1,96 @@
 # pyMap
 
-Raster Map Download Helper
+Map tiles Download Helper
 
-## Similar Project
+## Base on Projects
 
  - [brandonxiang/pyMap](https://github.com/brandonxiang/pyMap) Raster Map Download Helper by python.
  - [brandonxiang/pyMap_GFW](https://github.com/brandonxiang/pyMap_GFW) Raster Map Download Helper with [selenium](https://github.com/SeleniumHQ/selenium/) and [PhantomJS](http://phantomjs.org/)
- - [brandonxiang/pyMap_webapp](https://github.com/brandonxiang/pyMap_webapp) A webapp version for [pyMap]((https://github.com/brandonxiang/pyMap)
- - [brandonxiang/nodemap_spider](https://github.com/brandonxiang/nodemap_spider) Crawler Project for Raster Map by Electron.
- - [brandonxiang/nodemap](https://github.com/brandonxiang/nodemap) A electron app for [nodemap_spider](https://github.com/brandonxiang/nodemap_spider)
 
-这是一个简单的实例，去实现地图下载工具。如今又很多瓦片的下载工具，但是都是收费的，感觉既然是盗版还要收费，非常不好。我决定做一个简单的地图下载器，将瓦片下载拼接成对应的图片。
+
+一个简单的地图下载工具，其中地图tile的x、y、z计算方法使用的是上述依赖项目的的方法；在此基础上修改了下载配置方法，添加多进程和同一zoom切片下载的功能提高下载速度，并让进度显示更加有好，
+增加请求失败的日志和请求失败进行重试的方法。
+
+This is a simple tool which is used to download map tiles png image. This tool is based on  [brandonxiang/pyMap](https://github.com/brandonxiang/pyMap);
+Some new feature is added to the tool: 1. download with multi process, 2. split lng and lat at same zoom, 3.add error log, 4. retry when connect failed
+
 
 经供参考，不要从事商业用途，后果自负。
 
-## 依赖
+## dependency
 
-- python3.5
+- python 3.5+
 - requests 负责下载功能
 - pillow 负责图片拼接
 - tqdm 负责进度条
 
-## 安装
+## install
 
-1. 安装python3.5
+1. install python 3.5+
 
-2. 安装对应的第三方库
-
+2. install python module
 ```
-pip install -r requirement.txt
-```
-
-## 用法
-
-### 配置文件
-
-配置文件格式
-
-如果使用瓦片编码下载
-
-```
-[config]
-下载方式 = 瓦片编码
-左上横轴 = 803
-左上纵轴 = 984
-右下横轴 = 857
-右下纵轴 = 1061
-级别 = 8
-项目名 = test
-地图地址 = default
+    pip install requests
+    pip install Pillow
+    pip install tqdm
 ```
 
-如果使用地理编码下载
+## usage
+
+### config file
+
+#### config file example
+
+##### tile number mode
 
 ```
 [config]
-下载方式 = 地理编码
-左上横轴 = 113.889962
-左上纵轴 = 22.456671
-右下横轴 = 114.212686
-右下纵轴 = 22.345576
-级别 = 13
-项目名 = sample
-地图地址 = gaode
+MODE = tile_code
+NW_LAT = 803
+NW_LNG = 984
+SE_LAT = 1061
+SE_LNG = 857
+ZOOM = 15
+FOLDER = test
+MIXTURE = mosaic
+MAP_TYPE = default
+SLICE_LEVEL = 10
+SLICE_STEP = 1
+```
+
+##### lng and lat scope
+
+```
+[config]
+MODE = 地理编码
+NW_LAT = 22.456671
+NW_LNG = 113.889962
+SE_LAT = 22.345576
+SE_LNG = 114.212686
+ZOOM = 15
+FOLDER = test
+MIXTURE = mosaic
+MAP_TYPE = default
+SLICE_LEVEL = 10
+SLICE_STEP = 1
 ```
 
 
-### 运用命令行
+### command line
 
 ```
-python pyMap.py 22.456671 113.889962 22.345576 114.212686 13 sample gaode
-```
-
-- 参数1： 西北角纬度
-- 参数2： 西北角经度
-- 参数3： 东南角纬度
-- 参数4： 东南角经度
-- 参数5： 比例尺级别
-- 参数6： 输出路径（默认'output/mosaic.png'）
-- 参数7： 地图类型（默认'gaode.image'）
-
-### 硬编码
-
-请自修修改，下面是通过经纬度下载数据。
+python pyMap.py 22.456671 113.889962 22.345576 114.212686 13 FOLDER MAP_TYPE
 
 ```
-def test():
-    process_latlng(22.4566710000, 113.8899620000, 22.3455760000, 114.2126860000, 13)
-```
 
-或者通过瓦片编号下载数据。
+- param1: NW_LAT
+- param2: NW_LNG
+- param3: SE_LAT
+- param4: SE_LNG
+- param5: ZOOM
+- param6: FOLDER（default 'mixture/mosaic.png'）
+- param7: MAP_TYPE（default 'MAP_TYPE/mosaic.png'）
 
-```
-def test():
-    process_tilenum(1566, 1788, 1976, 2149, 9, "output/overlay.png")
-```
 
 ## License
 
