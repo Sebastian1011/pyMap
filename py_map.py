@@ -1,5 +1,5 @@
 """
-github: https://github.com/brandonxiang/pyMap
+github: https://github.com/Sebastian1011/py_map.git
 license: MIT
 """
 import os
@@ -9,6 +9,11 @@ import requests
 from PIL import Image
 from tqdm import trange
 import configparser
+import time
+from multiprocessing import Pool
+from requests import Session
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util import Retry
 
 URL = {
     "gaode": "http://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}",
@@ -18,7 +23,8 @@ URL = {
     "tianditusat":"http://t2.tianditu.cn/DataServer?T=img_w&X={x}&Y={y}&L={z}",
     "esrisat":"http://server.arcgisonline.com/arcgis/rest/services/world_imagery/mapserver/tile/{z}/{y}/{x}",
     "gaode.road": "http://webst02.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scale=1&style=8",
-    "default":"http://61.144.226.124:9001/map/GISDATA/WORKNET/{z}/{y}/{x}.png",
+    "default":"http://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    "openstreet": "http://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
     "szbuilding":"http://61.144.226.124:9001/map/GISDATA/SZBUILDING/{z}/{y}/{x}.png",
     "szbase":"http://61.144.226.44:6080/arcgis/rest/services/basemap/szmap_basemap_201507_01/MapServer/tile/{z}/{y}/{x}"
 }
@@ -91,10 +97,10 @@ def download(left, right, top, bottom, zoom, filename, maptype="default"):
 
 def _download(x, y, z, filename, maptype):
     url = URL.get(maptype, maptype)
-    path = './tiles/%s/%i/%i' % (filename, z, x) 
+    path = './tiles/%s/%i/%i' % (filename, z, x)
     map_url = url.format(x=x, y=y, z=z)
     r = requests.get(map_url)
-    
+
     if not os.path.isdir(path):
         os.makedirs(path)
     with open('%s/%i.png' % (path, y), 'wb') as f:

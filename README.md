@@ -51,7 +51,7 @@ NW_LNG = 984
 SE_LAT = 1061
 SE_LNG = 857
 ZOOM = 15
-FOLDER = test
+PROJECT  = test
 MIXTURE = mosaic
 MAP_TYPE = default
 SLICE_LEVEL = 10
@@ -68,7 +68,7 @@ NW_LNG = 113.889962
 SE_LAT = 22.345576
 SE_LNG = 114.212686
 ZOOM = 15
-FOLDER = test
+PROJECT = test
 MIXTURE = mosaic
 MAP_TYPE = default
 SLICE_LEVEL = 10
@@ -79,7 +79,7 @@ SLICE_STEP = 1
 ### command line
 
 ```
-python pyMap.py 22.456671 113.889962 22.345576 114.212686 13 FOLDER MAP_TYPE
+python pyMap.py 22.456671 113.889962 22.345576 114.212686 13 PROJECT MAP_TYPE
 
 ```
 
@@ -88,8 +88,8 @@ python pyMap.py 22.456671 113.889962 22.345576 114.212686 13 FOLDER MAP_TYPE
 - param3: SE_LAT
 - param4: SE_LNG
 - param5: ZOOM
-- param6: FOLDER（default 'mixture/mosaic.png'）
-- param7: MAP_TYPE（default 'MAP_TYPE/mosaic.png'）
+- param6: PROJECT （default 'mixture/mosaic.png'）
+- param7: MAP_TYPE（default 'MAP_TYPE/'）
 
 
 ## License
