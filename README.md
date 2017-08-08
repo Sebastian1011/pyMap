@@ -45,41 +45,45 @@ Some new feature is added to the tool: 1. download with multi process, 2. split 
 
 ```
 [config]
-MODE = tile_code
+MODE = TILE_CODE
 NW_LAT = 803
 NW_LNG = 984
 SE_LAT = 1061
 SE_LNG = 857
-ZOOM = 15
+MIN_ZOOM = 15
+MAX_ZOOM = 17
 PROJECT  = test
 MIXTURE = mosaic
 MAP_TYPE = default
 SLICE_LEVEL = 10
 SLICE_STEP = 1
+PROCESS_NUM = 4
 ```
 
 ##### lng and lat scope
 
 ```
 [config]
-MODE = 地理编码
+MODE = LNG_LAT
 NW_LAT = 22.456671
 NW_LNG = 113.889962
 SE_LAT = 22.345576
 SE_LNG = 114.212686
-ZOOM = 15
+MIN_ZOOM = 15
+MAX_ZOOM = 17
 PROJECT = test
 MIXTURE = mosaic
 MAP_TYPE = default
 SLICE_LEVEL = 10
 SLICE_STEP = 1
+PROCESS_NUM = 4
 ```
 
 
 ### command line
 
 ```
-python pyMap.py 22.456671 113.889962 22.345576 114.212686 13 PROJECT MAP_TYPE
+python pyMap.py 22.456671 113.889962 22.345576 114.212686 13 15 PROJECT MAP_TYPE
 
 ```
 
@@ -87,9 +91,10 @@ python pyMap.py 22.456671 113.889962 22.345576 114.212686 13 PROJECT MAP_TYPE
 - param2: NW_LNG
 - param3: SE_LAT
 - param4: SE_LNG
-- param5: ZOOM
-- param6: PROJECT （default 'mixture/mosaic.png'）
-- param7: MAP_TYPE（default 'MAP_TYPE/'）
+- param5: MIN_ZOOM
+- param6: MAX_ZOOM
+- param7: PROJECT （default 'mixture/mosaic.png'）
+- param8: MAP_TYPE（default 'MAP_TYPE/'）
 
 
 ## License

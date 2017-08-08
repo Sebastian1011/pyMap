@@ -1,7 +1,9 @@
+#! /usr/bin/env python
 """
 github: https://github.com/Sebastian1011/py_map.git
 license: MIT
 """
+
 import os
 import sys
 import math
@@ -10,6 +12,7 @@ from PIL import Image
 from tqdm import trange
 import configparser
 import time
+from datetime import datetime
 from multiprocessing import Pool
 from requests import Session
 from requests.adapters import HTTPAdapter
@@ -29,8 +32,7 @@ URL = {
     "szbase":"http://61.144.226.44:6080/arcgis/rest/services/basemap/szmap_basemap_201507_01/MapServer/tile/{z}/{y}/{x}"
 }
 
-
-def process_latlng(north, west, south, east, zoom, output='mosaic', maptype="default"):
+def process_latlng(north, west, south, east, zoom, project='default', maptype="default", output='mosaic'):
     """
     download and mosaic by latlng
 
@@ -43,6 +45,7 @@ def process_latlng(north, west, south, east, zoom, output='mosaic', maptype="def
     output -- output file name default mosaic
 
     """
+    print("Start to download zoom : {0}".format(zoom))
     north = float(north)
     west = float(west)
     south = float(south)
@@ -57,10 +60,12 @@ def process_latlng(north, west, south, east, zoom, output='mosaic', maptype="def
 
     left, top = latlng2tilenum(north, west, zoom)
     right, bottom = latlng2tilenum(south, east, zoom)
-    process_tilenum(left, right, top, bottom, zoom, output, maptype)
+    process_tilenum(left, right, top, bottom, zoom, project, maptype, output)
+    log = "Level {}, scope: ({},{})({},{}) download finished.".format(zoom, north, west, south, east)
+    print(log)
+    append_success_log(log, project)
 
-
-def process_tilenum(left, right, top, bottom, zoom, output='mosaic', maptype="default"):
+def process_tilenum(left, right, top, bottom, zoom, project="default", maptype="default", output='mosaic'):
     """
     download and mosaic by tile number
 
@@ -81,25 +86,32 @@ def process_tilenum(left, right, top, bottom, zoom, output='mosaic', maptype="de
     assert(right>=left)
     assert(bottom>=top)
 
-    filename = getname(output, maptype)
-    download(left, right, top, bottom, zoom, filename, maptype)
-    _mosaic(left, right, top, bottom, zoom, output, filename)
+    download(left, right, top, bottom, zoom, project, maptype)
+    _mosaic(left, right, top, bottom, zoom, output, project)
 
-
-def download(left, right, top, bottom, zoom, filename, maptype="default"):
-
-    for x in trange(left, right + 1):
-        for y in trange(top, bottom + 1):
-            path = './tiles/%s/%i/%i/%i.png' % (filename, zoom, x, y)
+def download(left, right, top, bottom, zoom, project, maptype="default"):
+    for x in trange(left, right + 1, desc="Zoom:{}, nw:({},{}),se:({},{})".format(zoom, left, top, right, bottom), leave=False):
+        for y in trange(top, bottom + 1, desc="Zoom:{} sub job, nw:({},{}),se:({},{})".format(zoom, left, top, right, bottom), leave=False):
+            path = './tiles/%s/%i/%i/%i.png' % (project, zoom, x, y)
             if not os.path.exists(path):
-                _download(x, y, zoom,filename,maptype)
+                _download(x, y, zoom, project,maptype)
 
-
-def _download(x, y, z, filename, maptype):
+def _download(x, y, z, project, maptype):
     url = URL.get(maptype, maptype)
-    path = './tiles/%s/%i/%i' % (filename, z, x)
+    path = './tiles/%s/%i/%i' % (project, z, x)
     map_url = url.format(x=x, y=y, z=z)
-    r = requests.get(map_url)
+    r = None
+    for i in range(10):
+        try:
+            r = requests.get(map_url)
+        except Exception as e:
+            if i>=9:
+                append_error_log(map_url, project)
+            else:
+                time.sleep(0.5)
+        else:
+            time.sleep(0.1)
+            break
 
     if not os.path.isdir(path):
         os.makedirs(path)
@@ -109,22 +121,34 @@ def _download(x, y, z, filename, maptype):
                 f.write(chunk)
                 f.flush()
 
+# this function used to append failed image download
+def append_error_log(log, project_name):
+    log_file_name = "error_log_" + project_name + ".txt";
+    with open(log_file_name, "a") as log_file:
+        log_file.write(log+"\n")
 
-def _mosaic(left, right, top, bottom, zoom, output, filename):
+def append_success_log(log, project_name):
+    log_file_name = "success_log_" + project_name + ".txt";
+    with open(log_file_name, "a") as log_file:
+        log_file.write(log+'\n')
+
+# merge tiles into one image
+def _mosaic(left, right, top, bottom, zoom, output, project):
 
     size_x = (right - left + 1) * 256
     size_y = (bottom - top + 1) * 256
     output_im = Image.new("RGBA", (size_x, size_y))
 
     for x in trange(left, right + 1):
-        for y in trange(top, bottom + 1):
-            path = './tiles/%s/%i/%i/%i.png' % (filename, zoom, x, y)
+        for y in trange(top, bottom + 1, desc="Merge image zoom :{}".format(zoom)):
+            path = './tiles/%s/%i/%i/%i.png' % (project, zoom, x, y)
             if os.path.exists(path):
                 target_im = Image.open(path)
                 # if target_im.mode == 'P':
                 output_im.paste(target_im, (256 * (x - left), 256 * (y - top)))
                 target_im.close()
-    output = "output/"+output+".png"
+    output = "merged/{}/{}/{}.png".format(project, zoom, output)
+    # output = "merged/"+output+".png"
     output_path = os.path.split(output)
     if len(output_path) > 1 and len(output_path) != 0:
         if not os.path.isdir(output_path[0]):
@@ -151,41 +175,111 @@ def latlng2tilenum(lat_deg, lng_deg, zoom):
     ytile = (1 - (math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi)) / 2 * n
     return math.floor(xtile), math.floor(ytile)
 
-def getname(output,maptype):
-    url = URL.get(maptype, maptype)
-    return maptype if url != maptype else output
 
+# get float range
+def frange(min_v, max_v, step = 1):
+    assert(max_v >= min_v)
+    range_list = []
+    range_list.append(min_v)
+    tem_v = min_v + step
+    while tem_v < max_v:
+        range_list.insert(0, tem_v)
+        tem_v = tem_v + step
+    range_list.insert(0, max_v)
+    return range_list
+
+# slice lng and lat
+def break_into_process(nw_lat, nw_lng, se_lat, se_lng, min_zoom, max_zoom, step, slice_level=10):
+    process_list = []
+    y_list = frange(se_lat, nw_lat, step)
+    x_list = frange(nw_lng, se_lng, step)
+    x_list.reverse()
+    for zoom in range(min_zoom, max_zoom+1):
+        if zoom < slice_level:
+            process_list.append({"nw_lat": nw_lat, "nw_lng": nw_lng, "se_lat": se_lat, "se_lng": se_lng, "zoom": zoom})
+        else:
+            for i in range(len(x_list) -1):
+                start_x = x_list[i]
+                end_x = x_list[i+1]
+                for j in range(len(y_list) -1):
+                    start_y = y_list[j]
+                    end_y = y_list[j + 1]
+                    process_list.append({"nw_lat":start_y, "nw_lng": start_x, "se_lat": end_y, "se_lng": end_x, "zoom": zoom})
+    return process_list
 
 def config():
     cf = configparser.ConfigParser()
-    cf.read("config.conf", encoding="utf-8-sig")
-    download = cf.get("config","下载方式")
-    left = cf.get("config","左上横轴")
-    top = cf.get("config","左上纵轴")
-    right = cf.get("config","右下横轴")
-    bottom = cf.get("config","右下纵轴")
-    zoom = cf.get("config","级别")
-    name = cf.get("config","项目名")
-    maptype = cf.get("config","地图地址")
+    cf.read("config.conf", encoding="utf-8")
+    configs = {}
+    configs["mode"] = cf.get("config", "MODE")
+    is_tile_code_mode = configs.get("mode") == "TILE_CODE"
+    configs["nw_lat"] = is_tile_code_mode and int(cf.get("config", "NW_LAT")) or float(cf.get("config", "NW_LAT"))
+    configs["nw_lng"] = is_tile_code_mode and int(cf.get("config", "NW_LNG")) or float(cf.get("config", "NW_LNG"))
+    configs["se_lat"] = is_tile_code_mode and int(cf.get("config", "SE_LAT")) or float(cf.get("config", "SE_LAT"))
+    configs["se_lng"] = is_tile_code_mode and int(cf.get("config", "SE_LNG")) or float(cf.get("config", "SE_LNG"))
+    configs["min_zoom"] = int(cf.get("config", "MIN_ZOOM"))
+    configs["max_zoom"]= int(cf.get("config", "MAX_ZOOM"))
+    configs["project"] = cf.get("config", "PROJECT")
+    configs["mixture"] = cf.get("config", "MIXTURE")
+    configs["map_type"] = cf.get("config", "MAP_TYPE")
+    configs["slice_level"] = int(cf.get("config", "SLICE_LEVEL"))
+    configs["slice_step"] = float(cf.get("config", "SLICE_STEP"))
+    configs["process_num"] = int(cf.get("config", "PROCESS_NUM"))
+    return configs;
 
-    if download == "瓦片编码":
-        process_tilenum(left,right,top,bottom,zoom,name,maptype)
-    elif download == "地理编码":
-        process_latlng(top,left,bottom,right,zoom,name,maptype)
-
-
-
-def test():
-    process_tilenum(803,857,984,1061,8,'WORKNET')
-
-
-def cml():
+def test_mode():
     if not len(sys.argv) in [7, 8]:
-        print('input 7 parameter northeast latitude,northeast longitude, southeast latitude, southeast longitude,zoom , output file, map type like gaode')
-        return
-    process_latlng(float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4]), int(sys.argv[5]), str(sys.argv[6]), str(sys.argv[7]))
+        print('Input 7 parameter nw_lat, nw_lng, se_lat, se_lng, zoom, output_file, map_type\n')
+        print("Script will use config file")
+        return config()
+    else:
+        configs = {}
+        configs["mode"] = "lng_lat"
+        configs["nw_lat"] = float(sys.argv[1])
+        configs["nw_lng"] = float(sys.argv[2])
+        configs["se_lat"] = float(sys.argv[3])
+        configs["se_lng"] = float(sys.argv[4])
+        configs["min_zoom"] = int(sys.argv[5])
+        configs["max_zoom"]= int(sys.argv[6])
+        configs["project"] = str(sys.argv[7])
+        configs["mixture"] = "mosaic"
+        configs["map_type"] = str(sys.argv[8])
+        configs["slice_level"] = 11
+        configs["slice_step"] = 1
+        configs["process_num"] = 4
+        return configs
+def tile_code_mode(configs):
+    print("tile code mode start")
+    for zoom in range(configs.get("min_zoom"), configs.get("max_zoom")+1):
+        process_tilenum(configs.get("nw_lng"), configs.get("se_lng"), configs.get("nw_lat"), configs.get("se_lat"), zoom, configs.get("project"), configs.get("map_type"), configs.get("mixture"))
+
+
+def lng_lat_mode(configs):
+    print("lng lat mode start")
+    process_list = break_into_process(configs.get("nw_lat"), configs.get("nw_lng"), configs.get("se_lat"), configs.get("se_lng"), configs.get("min_zoom"), configs.get("max_zoom"), configs.get("slice_step"), configs.get("slice_level"))
+    t_pool = Pool(configs.get("process_num"))
+    for val in process_list:
+        t_pool.apply_async(process_latlng, args=(val.get("nw_lat"), val.get("nw_lng"), val.get("se_lat"), val.get("se_lng"), val.get("zoom"), configs.get("project"), configs.get("map_type"), configs.get("mixture"),))
+    t_pool.close()
+    t_pool.join()
+
+def clear_log(project):
+    error_log_file = "error_log_" + project + ".txt"
+    success_log_file = "success_log_" + project +".txt"
+    open(error_log_file, 'w').close()
+    open(success_log_file, 'w').close()
+
+
+def run_download():
+    configs = test_mode()
+    print("Configs is : {}".format(configs))
+    if configs.get("mode") == "TILE_CODE":
+        tile_code_mode(configs)
+    else:
+        lng_lat_mode(configs)
+    print("Download end, end time is {}".format(str(datetime.now())))
+
+
 
 if __name__ == '__main__':
-    config()
-    # test()
-    # cml()
+    run_download()
